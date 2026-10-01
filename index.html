@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cubismo Sintético - Duelo de Vanguardias | 6to 6ta Arte</title>
+  <meta name="description" content="Videojuego interactivo y educativo sobre el Cubismo Sintético para la exposición de Arte de 6to año.">
+
+  <!-- Fuentes Avant-Garde y Modernas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Estilos del Sistema Cubista -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Favicon Cubista Vectorial -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,10 90,90 10,90' fill='%23e5a93b'/></svg>">
+
+  <!-- Librerías de Red (con CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+</head>
+<body>
+
+  <!-- Canvas para Confeti del Podio -->
+  <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+
+  <!-- Encabezado de la Aplicación -->
+  <header class="app-header">
+    <div class="logo-badge" onclick="window.app.resetToHome()" style="cursor: pointer;">
+      <div class="logo-icon" style="display:flex; align-items:center; justify-content:center;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cubist-ochre)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 22 22 2 22"></polygon>
+          <line x1="12" y1="2" x2="12" y2="22"></line>
+        </svg>
+      </div>
+      <div>
+        <h1 class="logo-title">CUBISMO SINTÉTICO</h1>
+        <div class="logo-subtitle">6to 6ta • Las Vanguardias Artísticas</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="btn-sound-toggle" class="icon-btn" title="Audio">
+        <svg id="svg-sound-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" onclick="window.app.resetToHome()" title="Inicio">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="main-container">
+
+    <!-- ====================================================================
+         VISTA 1: PORTADA SIMPLE (SOLO NOMBRE Y BOTÓN ENTRAR)
+         ==================================================================== -->
+    <section id="view-landing" class="view active">
+      <div class="hero-card" style="max-width: 600px; margin: 2rem auto; text-align: center;">
+        <span class="hero-badge">Actividad 4 • Las Vanguardias</span>
+        <h2 class="hero-title" style="font-size: 2.2rem; margin-bottom: 0.5rem;">DUELO DE VANGUARDIA</h2>
+        <p class="hero-description" style="margin-bottom: 1.5rem; font-size: 1rem;">
+          Exposición interactiva sobre el <strong>Cubismo Sintético (1912-1914)</strong>: collage, <em>papier collé</em>, 
+          Juan Gris, Picasso y la síntesis formal.
+        </p>
+
+        <!-- Preview de la Obra de Arte Sintética -->
+        <div style="border-radius: var(--radius-md); overflow: hidden; border: 2px solid var(--cubist-ochre); margin-bottom: 1.5rem; box-shadow: var(--shadow-lg);">
+          <img src="assets/cubismo_obra.jpg" alt="Naturaleza muerta cubista con guitarra y collage" style="width: 100%; height: auto; display: block;">
+        </div>
+
+        <form onsubmit="event.preventDefault(); playerController.enterWithName();" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div class="form-group" style="text-align: left; margin-bottom: 0.5rem;">
+            <label class="form-label" for="student-name-input">Ingresa tu Nombre o Apodo:</label>
+            <input id="student-name-input" type="text" class="form-input" placeholder="Tu nombre..." autofocus required>
+          </div>
+          <button type="submit" class="btn-primary" style="justify-content: center; font-size: 1.15rem; padding: 1rem;">
+            Entrar al Juego ➔
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VISTA 2: LISTA DE GRUPOS Y CREACIÓN (HUB DE ESTUDIANTES)
+         ==================================================================== -->
+    <section id="view-groups-hub" class="view">
+      <div class="hero-card" style="padding: 2rem 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+          <div>
+            <h2 id="hub-student-greeting" style="font-family: var(--font-display); font-size: 1.8rem; color: var(--cubist-ochre);">¡Hola!</h2>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">Crea un grupo para tu equipo o únete a uno existente.</p>
+          </div>
+          <button id="hub-create-group-btn" class="btn-primary btn-terracotta" onclick="playerController.showCreateGroupModal()">
+            <span style="font-size: 1.2rem; font-weight: bold; margin-right: 4px;">+</span> Crear Grupo
+          </button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 1.2rem;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 1px; color: var(--cubist-kraft);">
+            Grupos del Curso:
+          </h3>
+          <div id="hub-groups-container">
+            <!-- Lista inyectada por JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODAL PARA CREAR GRUPO -->
+    <div id="create-group-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 999; align-items: center; justify-content: center; padding: 1.5rem;">
+      <div class="hero-card" style="max-width: 480px; width: 100%; margin: 0; background: var(--bg-card);">
+        <h3 style="font-family: var(--font-display); font-size: 1.5rem; margin-bottom: 1rem; color: var(--cubist-ochre);">
+          Crear Nuevo Grupo
+        </h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.2rem;">
+          Asigna un nombre para tu equipo:
+        </p>
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label" for="new-group-name-input">Nombre del Grupo:</label>
+          <input id="new-group-name-input" type="text" class="form-input" placeholder="Escribe el nombre del grupo...">
+        </div>
+        <div style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.5rem;">
+          <button id="modal-cancel-create-btn" class="btn-primary" style="background: rgba(255,255,255,0.1); color: white;" onclick="playerController.hideCreateGroupModal()">
+            Cancelar
+          </button>
+          <button id="modal-confirm-create-btn" class="btn-primary btn-terracotta" onclick="playerController.confirmCreateGroup()">
+            Confirmar y Crear
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VISTA 3: SALA DE ESPERA DEL GRUPO (ANTES DE QUE SE INICIE)
+         ==================================================================== -->
+    <section id="view-group-room" class="view">
+      <div class="player-container" style="justify-content: center;">
+        <div class="player-feedback-card" style="text-align: center;">
+          <span class="badge-tag" id="group-room-role">Integrante</span>
+          <h2 id="group-room-title" style="font-family: var(--font-display); font-size: 2rem; color: var(--cubist-ochre); margin-top: 0.8rem;">
+            Mi Grupo
+          </h2>
+          <div style="margin: 1.5rem 0;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Integrantes en el grupo:</p>
+            <div id="group-room-members" style="min-height: 40px;"></div>
+          </div>
+          <div style="background: rgba(229, 169, 59, 0.08); border: 1px dashed var(--cubist-ochre); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+            <p style="color: var(--cubist-kraft); font-size: 0.95rem; display: flex; align-items: center; justify-content: center;">
+              <span class="pulse-dot"></span> Esperando a que comience la ronda...
+            </p>
+          </div>
+          <button class="btn-primary" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); font-size: 0.85rem;" onclick="playerController.leaveGroup()">
+            ← Salir de este grupo
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VISTA 4: VOTACIÓN DE ALUMNOS VIVOS (CON VISIBILIDAD DE VOTOS)
+         ==================================================================== -->
+    <section id="view-player-voting" class="view">
+      <div class="player-container">
+        <!-- Barra de tiempo de 3 minutos -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 0.8rem 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); margin-bottom: 1rem;">
+          <span id="pv-q-theme" class="question-theme" style="margin: 0;">TEMA</span>
+          <div id="pv-timer" class="timer-circle" style="width: 50px; height: 50px; font-size: 1.2rem;">3:00</div>
+        </div>
+
+        <div class="question-box" style="padding: 1.2rem 1rem; margin-bottom: 1rem;">
+          <h3 id="pv-q-text" style="font-size: 1.15rem; line-height: 1.4;">Pregunta aquí</h3>
+        </div>
+
+        <!-- Botones de Voto -->
+        <div id="pv-options-grid" style="display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1.2rem;">
+          <!-- Botones inyectados por JS -->
+        </div>
+
+        <!-- Alerta de Empate -->
+        <div id="pv-tie-warning" style="display: none; background: rgba(211, 82, 53, 0.2); border: 1px solid var(--cubist-terracotta); padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem; color: #fca5a5;"></div>
+
+        <!-- Panel en Vivo: Qué votaron los integrantes del grupo -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 1rem;">
+          <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--cubist-kraft); letter-spacing: 1px; margin-bottom: 0.6rem;">
+            Votos en tu grupo:
+          </h4>
+          <div id="pv-group-votes-list">
+            <!-- Votos de compañeros inyectados por JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VISTA 5: MODO ALIANZA (AYUDA DE GRUPOS ELIMINADOS)
+         ==================================================================== -->
+    <section id="view-player-ghost-mode" class="view">
+      <div class="player-container">
+        <!-- Barra de tiempo en modo alianza -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 0.6rem 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); margin-bottom: 0.8rem;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.5px;">Modo Alianza</span>
+          <div id="pv-ghost-timer" class="timer-circle" style="width: 44px; height: 44px; font-size: 1.1rem; border-color: #a855f7; color: #c084fc;">3:00</div>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 1rem; background: rgba(168, 85, 247, 0.15); border: 1px solid #a855f7; border-radius: var(--radius-md); padding: 1rem;">
+          <h3 style="color: #c084fc; font-family: var(--font-display); font-size: 1.25rem;">MODO ALIANZA: Transmisión de Pista</h3>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.3rem; line-height: 1.4;">
+            Tu grupo no continúa en competencia, pero pueden transmitir una sugerencia a un grupo aliado. Si <strong>todos</strong> los integrantes votan la misma opción, esta se resaltará en la pantalla de su aliado.
+          </p>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label class="form-label" for="ghost-target-select">¿A qué grupo aliado transmitir la pista?</label>
+          <select id="ghost-target-select" class="form-input" style="background: #23252d; cursor: pointer;">
+            <!-- Opciones inyectadas por JS -->
+          </select>
+        </div>
+
+        <div class="question-box" style="padding: 1rem; margin-bottom: 1rem;">
+          <h4 id="ghost-q-text" style="font-size: 1rem; line-height: 1.3;">Pregunta</h4>
+        </div>
+
+        <div id="ghost-buzzer-grid" style="display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem;">
+          <!-- Botones inyectados por JS -->
+        </div>
+
+        <div id="ghost-consensus-status" style="background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); padding: 0.8rem; text-align: center; font-size: 0.9rem;">
+          <!-- Estado de unanimidad inyectado por JS -->
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         VISTA 6: RESULTADO / EVALUACIÓN DE LA PREGUNTA (ALUMNO)
+         ==================================================================== -->
+    <section id="view-player-eval" class="view">
+      <div class="player-container" style="justify-content: center;">
+        <div id="player-eval-card" class="player-feedback-card">
+          <!-- Inyectado por JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VISTAS SECRETAS DE ADMIN / PROYECTOR (#admin)
+         ==================================================================== -->
+    
+    <!-- ADMIN LOBBY -->
+    <section id="view-admin-lobby" class="view">
+      <div class="hero-card" style="border-color: var(--cubist-ochre);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+          <div>
+            <span class="hero-badge" style="background: rgba(229, 169, 59, 0.15);">Panel de Control</span>
+            <h2 style="font-family: var(--font-display); font-size: 2.2rem; color: var(--cubist-ochre);">
+              PANEL PRINCIPAL
+            </h2>
+          </div>
+          <div style="text-align: right;">
+            <h3 id="admin-groups-count" style="font-size: 1.4rem;">0 Grupos Creados</h3>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Equipos en espera</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <button id="admin-start-first-btn" class="btn-primary" style="font-size: 1.2rem; padding: 1.1rem 2.5rem; width: 100%; justify-content: center;" onclick="adminController.startQuestionSession()" disabled>
+            Esperando a que los alumnos creen grupos...
+          </button>
+        </div>
+
+        <h3 style="font-size: 1.1rem; color: var(--cubist-kraft); text-transform: uppercase; margin-bottom: 1rem;">
+          Grupos Registrados:
+        </h3>
+        <div id="admin-groups-list" class="players-lobby-grid">
+          <!-- Grupos inyectados por JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN GAME SCREEN -->
+    <section id="view-admin-game" class="view">
+      <div class="game-topbar">
+        <div>
+          <div id="admin-q-round" class="round-pill">Ronda 1 • Pregunta 1</div>
+          <div id="admin-ready-count" style="font-size: 0.95rem; color: #22c55e; font-weight: bold; margin-top: 0.3rem;">
+            0 grupos listos
+          </div>
+        </div>
+
+        <!-- Controles de Tiempo de 3 minutos -->
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <button id="admin-pause-timer-btn" class="icon-btn" style="width: auto; padding: 0 1rem; border-radius: 8px; font-size: 0.9rem;" onclick="adminController.togglePauseTimer()">
+            Pausar
+          </button>
+          <button class="icon-btn" style="width: auto; padding: 0 0.8rem; border-radius: 8px; font-size: 0.9rem;" onclick="adminController.addTime(30)">
+            +30s
+          </button>
+          <div id="admin-timer" class="timer-circle" style="width: 70px; height: 70px; font-size: 1.7rem;">3:00</div>
+        </div>
+      </div>
+
+      <div class="question-box">
+        <div id="admin-q-theme" class="question-theme">TEMA DE VANGUARDIA</div>
+        <h2 id="admin-q-text" class="question-text">Pregunta del examen</h2>
+      </div>
+
+      <div id="admin-options-grid" class="options-grid">
+        <!-- 4 Opciones grandes -->
+      </div>
+
+      <div id="admin-explanation" class="explanation-card">
+        <h5>DATO HISTÓRICO:</h5>
+        <p id="admin-explanation-text"></p>
+      </div>
+
+      <!-- Estado en tiempo real de los grupos -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 1.2rem; margin: 1.5rem 0;">
+        <h4 style="font-size: 0.9rem; text-transform: uppercase; color: var(--cubist-kraft); margin-bottom: 0.8rem;">
+          Estado de Votación (Control Manual):
+        </h4>
+        <div id="admin-teams-voting-status" style="display: flex; flex-direction: column; gap: 0.6rem;"></div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+        <button id="admin-close-eval-btn" class="btn-primary btn-terracotta" style="font-size: 1.15rem; padding: 1rem 2.5rem;" onclick="adminController.closeQuestionAndEvaluate()">
+          Cerrar Votación y Evaluar Respuestas ➔
+        </button>
+        <button id="admin-next-q-btn" class="btn-primary" style="display: none; font-size: 1.15rem; padding: 1rem 2.5rem;">
+          Ver Marcador de la Ronda ➔
+        </button>
+      </div>
+    </section>
+
+    <!-- ADMIN LEADERBOARD -->
+    <section id="view-admin-leaderboard" class="view">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span class="hero-badge">Marcador Oficial</span>
+        <h2 style="font-family: var(--font-display); font-size: 2.2rem;">Tabla de Posiciones</h2>
+      </div>
+
+      <div id="admin-leaderboard-items" class="leaderboard-list">
+        <!-- Inyectado por JS -->
+      </div>
+
+      <div style="text-align: center; margin-top: 2rem;">
+        <button id="admin-leaderboard-next-btn" class="btn-primary" style="font-size: 1.15rem; padding: 1rem 2.8rem;">
+          Siguiente Pregunta ➔
+        </button>
+      </div>
+    </section>
+
+    <!-- ADMIN ELIMINATION -->
+    <section id="view-admin-elimination" class="view">
+      <div id="admin-elimination-summary">
+        <!-- Inyectado por JS -->
+      </div>
+      <div style="text-align: center; margin-top: 2.5rem;">
+        <button id="admin-start-final-btn" class="btn-primary btn-terracotta" style="font-size: 1.2rem; padding: 1rem 3rem;">
+          Iniciar la Gran Final con los Clasificados ➔
+        </button>
+      </div>
+    </section>
+
+    <!-- ADMIN PODIUM -->
+    <section id="view-admin-podium" class="view">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span class="hero-badge">Fin de la Exposición</span>
+        <h2 style="font-family: var(--font-display); font-size: 2.5rem; color: var(--cubist-ochre);">
+          CLASIFICACIÓN FINAL
+        </h2>
+      </div>
+
+      <div class="podium-container">
+        <div id="admin-podium-2" class="podium-step second"><div class="podium-block">2°</div></div>
+        <div id="admin-podium-1" class="podium-step first"><div class="podium-block">1°</div></div>
+        <div id="admin-podium-3" class="podium-step third"><div class="podium-block">3°</div></div>
+      </div>
+
+      <div style="text-align: center; margin-top: 2rem;">
+        <button class="btn-primary" onclick="window.app.resetToHome()">
+          Volver al Inicio
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Scripts del Sistema -->
+  <script src="js/questions.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/network.js"></script>
+  <script src="js/host.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
