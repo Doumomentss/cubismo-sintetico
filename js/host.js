@@ -132,6 +132,43 @@ class AdminController {
     this.broadcastSync();
   }
 
+  // Eliminación de grupo por el Administrador
+  deleteGroup(groupId) {
+    const group = this.groups[groupId];
+    if (!group) return;
+
+    const ok = confirm(`¿Estás seguro de que deseas eliminar el grupo "${group.name}"?\nLos integrantes volverán a la lista de grupos para unirse a otro.`);
+    if (!ok) return;
+
+    window.soundFX.playClick();
+    const groupName = group.name;
+
+    delete this.groups[groupId];
+    if (this.groupVotes[groupId]) delete this.groupVotes[groupId];
+    if (this.deadVotes[groupId]) delete this.deadVotes[groupId];
+
+    // Desvincular si algún grupo muerto lo tenía como objetivo
+    for (const gid in this.groups) {
+      if (this.groups[gid].targetAllyId === groupId) {
+        this.groups[gid].targetAllyId = null;
+      }
+    }
+
+    this.saveState();
+
+    // Sincronizar en tiempo real con todos los dispositivos por la red
+    window.gameNetwork.send('delete_group', { groupId, groupName });
+    this.broadcastSync();
+
+    this.renderAdminLobby();
+    if (this.isQuestionActive) {
+      this.renderAdminQuestionStatus();
+    }
+    if (window.app && window.app.showToast) {
+      window.app.showToast(`Grupo "${groupName}" eliminado`);
+    }
+  }
+
   // Recepción de voto de un integrante vivo
   handleCastVote(data) {
     if (!this.isQuestionActive) return;
@@ -211,15 +248,35 @@ class AdminController {
 
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-          <h4 style="font-size:1.2rem; color:var(--cubist-ochre);">${this.escapeHtml(g.name)}</h4>
-          <span style="font-size:0.8rem; background:rgba(255,255,255,0.1); padding:0.2rem 0.6rem; border-radius:12px;">
-            ${g.members.length} integrante(s)
-          </span>
+          <h4 style="font-size:1.2rem; color:var(--cubist-ochre); margin:0;">${this.escapeHtml(g.name)}</h4>
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <span style="font-size:0.8rem; background:rgba(255,255,255,0.1); padding:0.2rem 0.6rem; border-radius:12px;">
+              ${g.members.length} integrante(s)
+            </span>
+            <button class="btn-delete-group" id="btn-delete-group-${g.id}" title="Eliminar grupo">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+              <span>Eliminar</span>
+            </button>
+          </div>
         </div>
-        <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.4;">
+        <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.4; margin:0;">
           <strong>Integrantes:</strong> ${memberNames}
         </p>
       `;
+
+      const deleteBtn = card.querySelector(`#btn-delete-group-${g.id}`);
+      if (deleteBtn) {
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.deleteGroup(g.id);
+        };
+      }
+
       container.appendChild(card);
     });
   }
@@ -382,7 +439,16 @@ class AdminController {
       row.innerHTML = `
         <div style="flex:1;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-            <strong style="color:var(--cubist-ochre); font-size:1.1rem;">${this.escapeHtml(g.name)}</strong>
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              <strong style="color:var(--cubist-ochre); font-size:1.1rem;">${this.escapeHtml(g.name)}</strong>
+              <button class="btn-delete-group" id="btn-del-game-${g.id}" title="Eliminar grupo" style="padding:0.2rem 0.5rem; font-size:0.7rem;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Eliminar</span>
+              </button>
+            </div>
             <span style="font-weight:bold; color:${isReady ? '#22c55e' : 'var(--text-muted)'}; font-size:0.85rem; letter-spacing:0.5px;">
               ${isReady ? 'LISTO' : `${votedMembers}/${totalMembers} votaron`}
             </span>
@@ -392,6 +458,15 @@ class AdminController {
           </div>
         </div>
       `;
+
+      const delBtn = row.querySelector(`#btn-del-game-${g.id}`);
+      if (delBtn) {
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.deleteGroup(g.id);
+        };
+      }
+
       container.appendChild(row);
     });
 

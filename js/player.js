@@ -49,6 +49,7 @@ class PlayerController {
     window.gameNetwork.on('create_group', (data) => this.handleRemoteGroupCreated(data));
     window.gameNetwork.on('join_group', (data) => this.handleRemoteGroupJoined(data));
     window.gameNetwork.on('leave_group', (data) => this.handleRemoteGroupLeft(data));
+    window.gameNetwork.on('delete_group', (data) => this.handleRemoteGroupDeleted(data));
     window.gameNetwork.on('req_sync', () => this.handleReqSync());
     window.gameNetwork.on('req_groups_announce', () => {
       if (Object.keys(this.availableGroups).length > 0) {
@@ -58,10 +59,19 @@ class PlayerController {
 
     // 3. Sincronización instantánea (0ms) entre pestañas de la misma computadora
     window.addEventListener('storage', (e) => {
-      if (e.key === 'cubismo_classroom_groups' && e.newValue) {
+      if (e.key === 'cubismo_classroom_groups') {
         try {
-          this.availableGroups = JSON.parse(e.newValue);
-          if (this.myGroup && this.availableGroups[this.myGroup.id]) {
+          this.availableGroups = e.newValue ? JSON.parse(e.newValue) : {};
+          if (this.myGroup && !this.availableGroups[this.myGroup.id]) {
+            this.myGroup = null;
+            this.myVote = null;
+            this.myGhostVote = null;
+            this.stopLocalTimer();
+            if (window.app.currentViewId !== 'view-landing') {
+              window.app.switchView('view-groups-hub');
+              this.renderGroupsList();
+            }
+          } else if (this.myGroup && this.availableGroups[this.myGroup.id]) {
             this.myGroup = this.availableGroups[this.myGroup.id];
           }
           if (window.app.currentViewId === 'view-groups-hub') {
@@ -159,6 +169,48 @@ class PlayerController {
     }
   }
 
+  // RECEPCIÓN INSTANTÁNEA: El admin eliminó un grupo
+  handleRemoteGroupDeleted(data) {
+    if (!data || !data.groupId) return;
+    const deletedId = data.groupId;
+
+    delete this.availableGroups[deletedId];
+    localStorage.setItem('cubismo_classroom_groups', JSON.stringify(this.availableGroups));
+
+    // Si el alumno pertenecía a ese grupo
+    if (this.myGroup && this.myGroup.id === deletedId) {
+      this.myGroup = null;
+      this.myVote = null;
+      this.myGhostVote = null;
+      this.stopLocalTimer();
+      window.soundFX.playWrong();
+
+      // Volver a la pantalla del hub de grupos
+      if (window.app.currentViewId !== 'view-landing') {
+        window.app.switchView('view-groups-hub');
+        this.renderGroupsList();
+      }
+
+      if (window.app && window.app.showToast) {
+        window.app.showToast(`El grupo "${data.groupName || ''}" fue disuelto. Por favor elige o crea otro grupo.`);
+      }
+      return;
+    }
+
+    // Si este grupo era el aliado al que se le iba a dar la pista en Modo Alianza
+    if (this.myGroup && this.myGroup.targetAllyId === deletedId) {
+      this.myGroup.targetAllyId = null;
+      if (window.app.currentViewId === 'view-player-ghost-mode') {
+        this.renderGhostScreen();
+      }
+    }
+
+    // Si el alumno está en la lista de grupos, actualizarla
+    if (window.app.currentViewId === 'view-groups-hub') {
+      this.renderGroupsList();
+    }
+  }
+
   // PASO 1: Ingreso solo con Nombre
   enterWithName() {
     const input = document.getElementById('student-name-input');
@@ -186,7 +238,9 @@ class PlayerController {
   // PASO 2: Sincronización de Grupos y Estados
   handleSyncState(data) {
     if (!data) return;
-    this.availableGroups = Object.assign({}, this.availableGroups, data.groups || {});
+    if (data.groups) {
+      this.availableGroups = Object.assign({}, data.groups);
+    }
     this.currentQuestion = data.currentQuestion;
     this.groupVotes = data.groupVotes || {};
     this.deadVotes = data.deadVotes || {};
@@ -197,6 +251,23 @@ class PlayerController {
     }
 
     localStorage.setItem('cubismo_classroom_groups', JSON.stringify(this.availableGroups));
+
+    // Si el alumno pertenecía a un grupo pero fue eliminado en el Admin
+    if (this.myGroup && data.groups && !data.groups[this.myGroup.id]) {
+      this.myGroup = null;
+      this.myVote = null;
+      this.myGhostVote = null;
+      this.stopLocalTimer();
+      window.soundFX.playWrong();
+      if (window.app.currentViewId !== 'view-landing') {
+        window.app.switchView('view-groups-hub');
+        this.renderGroupsList();
+      }
+      if (window.app && window.app.showToast) {
+        window.app.showToast("Tu grupo fue disuelto. Por favor únete a otro grupo.");
+      }
+      return;
+    }
 
     // Actualizar mi grupo si pertenezco a alguno (estrictamente por ID de estudiante)
     if (this.myGroup) {

@@ -53,6 +53,17 @@ class AppManager {
     window.location.hash = '';
     window.location.reload();
   }
+
+  showToast(message, duration = 4000) {
+    const el = document.getElementById('app-toast');
+    if (!el) return;
+    el.innerHTML = message;
+    el.classList.add('show');
+    clearTimeout(this._toastTimeout);
+    this._toastTimeout = setTimeout(() => {
+      el.classList.remove('show');
+    }, duration);
+  }
 }
 
 window.app = new AppManager();
