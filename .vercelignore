@@ -2,3 +2,5 @@ node_modules
 test_*.js
 *.log
 .git
+server.js
+
